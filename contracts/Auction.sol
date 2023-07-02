@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+	// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 contract Auction {
@@ -18,6 +18,18 @@ contract Auction {
     // Mapping to store bids
     mapping(address => Bid) public bids;
 
+        // Modifier to check if the auction has ended
+    modifier onlyBeforeEnd() {
+        require(!ended, "Auction has already ended.");
+        _;
+    }
+
+    // Modifier to check if the caller is the auctioneer
+    modifier onlyAuctioneer() {
+        require(msg.sender == auctioneer, "Only the auctioneer can perform this action.");
+        _;
+    }
+
 
     constructor(uint256 _durationByHour) {
         auctioneer = msg.sender;
@@ -25,7 +37,7 @@ contract Auction {
     }
 
     // Function to place a bid
-    function placeBid() public payable {
+    function placeBid() public payable onlyBeforeEnd{
         require(msg.value > highestBid, "Bid amount must be higher than the current highest bid.");
 
         // If there was a previous highest bidder, refund their bid
@@ -42,7 +54,7 @@ contract Auction {
     }
 
     // Function to end the auction and declare the winner
-    function endAuction() public {
+    function endAuction() public onlyAuctioneer{
         require(!ended, "Auction has already ended.");
 
         // Transfer the highest bid amount to the auctioneer
