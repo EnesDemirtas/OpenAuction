@@ -18,7 +18,12 @@ contract Auction {
     // Mapping to store bids
     mapping(address => Bid) public bids;
 
-        // Modifier to check if the auction has ended
+    // Event triggered on bid placement
+    event BidPlaced(address bidder, uint256 amount);
+    // Event triggered when the auction ends
+    event AuctionEnded(address winner, uint256 amount);
+
+    // Modifier to check if the auction has ended
     modifier onlyBeforeEnd() {
         require(!ended, "Auction has already ended.");
         _;
@@ -51,6 +56,7 @@ contract Auction {
 
         // Store the bid
         bids[msg.sender] = Bid(msg.sender, msg.value);
+        emit BidPlaced(msg.sender, msg.value);
     }
 
     // Function to end the auction and declare the winner
@@ -61,5 +67,6 @@ contract Auction {
         payable(auctioneer).transfer(highestBid);
 
         ended = true;
+	emit AuctionEnded(highestBidder, highestBid);
     }
 }
