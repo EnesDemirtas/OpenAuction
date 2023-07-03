@@ -1,72 +1,62 @@
-	// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 contract Auction {
-    // Structure to represent a bid
     struct Bid {
         address bidder;
         uint256 amount;
     }
 
-    // Auction details
-    address public auctioneer;
-    uint256 public auctionEndTime;
-    uint256 public highestBid;
-    address public highestBidder;
-    bool public ended;
+    struct AuctionItem {
+        address auctioneer;
+        uint256 auctionEndTime;
+        uint256 highestBid;
+        address highestBidder;
+        bool ended;
+    }
 
-    // Mapping to store bids
-    mapping(address => Bid) public bids;
+    mapping(uint256 => mapping(address => Bid)) public bids;
+    AuctionItem[] public auctions;
 
-    // Event triggered on bid placement
-    event BidPlaced(address bidder, uint256 amount);
-    // Event triggered when the auction ends
-    event AuctionEnded(address winner, uint256 amount);
+    event BidPlaced(uint256 auctionIndex, address bidder, uint256 amount);
+    event AuctionEnded(uint256 auctionIndex, address winner, uint256 amount);
 
-    // Modifier to check if the auction has ended
-    modifier onlyBeforeEnd() {
-        require(!ended, "Auction has already ended.");
+    modifier onlyBeforeEnd(uint256 auctionIndex) {
+        require(!auctions[auctionIndex].ended, "Auction has already ended.");
+	_;
+    }
+
+    modifier onlyAuctioneer(uint256 auctionIndex) {
+        require(msg.sender == auctions[auctionIndex].auctioneer, "Only the auctioneer can perform this action.");
         _;
     }
 
-    // Modifier to check if the caller is the auctioneer
-    modifier onlyAuctioneer() {
-        require(msg.sender == auctioneer, "Only the auctioneer can perform this action.");
-        _;
+    function createAuction(uint256 _duration) public {
+        auctions.push(AuctionItem(msg.sender, block.timestamp + _duration, 0, address(0), false));
     }
 
+    function placeBid(uint256 auctionIndex) public payable onlyBeforeEnd(auctionIndex) {
+        AuctionItem storage auction = auctions[auctionIndex];
+        require(msg.value > auction.highestBid, "Bid amount must be higher than the current highest bid.");
 
-    constructor(uint256 _durationByHour) {
-        auctioneer = msg.sender;
-        auctionEndTime = block.timestamp + _durationByHour * 1 hours;
-    }
-
-    // Function to place a bid
-    function placeBid() public payable onlyBeforeEnd{
-        require(msg.value > highestBid, "Bid amount must be higher than the current highest bid.");
-
-        // If there was a previous highest bidder, refund their bid
-        if (highestBidder != address(0)) {
-            payable(highestBidder).transfer(highestBid);
+        if (auction.highestBidder != address(0)) {
+            payable(auction.highestBidder).transfer(auction.highestBid);
         }
 
-        // Update the highest bid and bidder
-        highestBid = msg.value;
-        highestBidder = msg.sender;
+        auction.highestBid = msg.value;
+        auction.highestBidder = msg.sender;
+        bids[auctionIndex][msg.sender] = Bid(msg.sender, msg.value);
 
-        // Store the bid
-        bids[msg.sender] = Bid(msg.sender, msg.value);
-        emit BidPlaced(msg.sender, msg.value);
+	emit BidPlaced(auctionIndex, msg.sender, msg.value);
     }
 
-    // Function to end the auction and declare the winner
-    function endAuction() public onlyAuctioneer{
-        require(!ended, "Auction has already ended.");
+    function endAuction(uint256 auctionIndex) public onlyAuctioneer(auctionIndex) {
+        AuctionItem storage auction = auctions[auctionIndex];
+        require(!auction.ended, "Auction has already ended.");
 
-        // Transfer the highest bid amount to the auctioneer
-        payable(auctioneer).transfer(highestBid);
+	payable(auction.auctioneer).transfer(auction.highestBid);
 
-        ended = true;
-	emit AuctionEnded(highestBidder, highestBid);
+        auction.ended = true;
+        emit AuctionEnded(auctionIndex, auction.highestBidder, auction.highestBid);
     }
 }
